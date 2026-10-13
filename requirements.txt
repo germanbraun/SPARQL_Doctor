@@ -1,0 +1,10 @@
+# Keep in sync with pyproject.toml.
+#
+# sparql-doctor itself has NO runtime dependencies (Python >= 3.10 standard library only).
+# Everything below is optional:
+
+# [http2] extra - adds a real HTTP/2 query next to the HTTP/1.1 one in the "http" check
+httpx[http2]>=0.24
+
+# [dev] extra - running the test suite
+pytest>=7

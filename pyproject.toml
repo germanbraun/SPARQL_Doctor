@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sparql-doctor"
+version = "0.1.0"
+description = "Diagnose SPARQL endpoints: HTTP/2, keep-alive & idle timeouts, User-Agent policies, CORS, result formats, query length limits and federation reachability."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+dependencies = []
+
+[project.optional-dependencies]
+# Enables an actual HTTP/2 request (otherwise only ALPN / h2c negotiation is probed).
+http2 = ["httpx[http2]>=0.24"]
+dev = ["pytest>=7"]
+
+[project.scripts]
+sparql-doctor = "sparql_doctor.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["sparql_doctor*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

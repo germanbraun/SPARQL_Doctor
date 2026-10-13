@@ -125,6 +125,11 @@ def run_checks(ctx: Context, selected: List[str], progress) -> List[CheckResult]
             for cid in order:
                 results[cid] = CheckResult(cid, funcs[cid][0]).skip("Endpoint unreachable (see Connectivity).")
             return [results[c] for c in CHECK_IDS if c in results]
+        if ctx.notes.get("no_sparql"):
+            # TLS/HTTP details are still useful; everything else would just repeat the same failure
+            for cid in [c for c in order if c != "http"]:
+                results[cid] = CheckResult(cid, funcs[cid][0]).skip("No SPARQL query succeeded (see Connectivity).")
+                order.remove(cid)
 
     # The idle-timeout probe mostly sleeps; run it alongside the other checks.
     bg = None

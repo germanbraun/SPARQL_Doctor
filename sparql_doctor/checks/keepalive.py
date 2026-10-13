@@ -48,6 +48,8 @@ def _watch_idle(ctx: Context, deadline_s: float) -> Dict:
     conn = open_connection(t)
     try:
         resp = sparql_request(t, PROBE, "GET", conn=conn)
+        if not resp.ok:
+            resp = sparql_request(t, PROBE, "GET", conn=conn)
         if not resp.ok or conn.sock is None:
             return {"outcome": "no-keepalive", "response": resp.describe()}
         sock = conn.sock
@@ -89,6 +91,8 @@ def _reuse_after(ctx: Context, delay: float) -> Dict:
     conn = open_connection(t)
     try:
         first = sparql_request(t, PROBE, "GET", conn=conn, throttle=False)
+        if not first.ok:
+            first = sparql_request(t, PROBE, "GET", conn=conn, throttle=False)
         if not first.ok:
             return {"delay": delay, "outcome": "first-failed", "detail": first.describe()}
         port = local_port(conn)
@@ -214,11 +218,22 @@ def run(ctx: Context) -> CheckResult:
         elif kind == "reconnected":
             r.add(Status.INFO, f"Connections idle {window} are closed by the server; well-behaved clients reconnect.",
                   hint)
+        elif w_out == "fin" and w_after is not None:
+            r.add(Status.WARN, f"Idle connections are closed after ≈{w_after:.0f} s; a client that reuses one later gets "
+                               f"'{labels.get(kind, kind)}' - the classic 'Connection reset by peer' pattern.",
+                  "The server closes gracefully, so clients that validate pooled connections before reuse are "
+                  "unaffected; those that don't fail intermittently. " + hint)
         else:
             r.add(Status.WARN, f"Reusing a connection idle {window} fails with '{labels.get(kind, kind)}'. "
                                f"This is the classic 'Connection reset by peer' pattern.", hint)
     elif good:
         r.add(Status.PASS, f"Pooled connections can be reused after up to {max(good):.0f} s idle.")
+    failed_start = [x for x in ladder if x and x["outcome"] == "first-failed"]
+    if failed_start and not good and not bad and w_out not in ("fin", "reset", "open"):
+        r.add(Status.WARN, f"Idle timeout could not be measured: the probe queries themselves failed "
+                           f"({failed_start[0].get('detail')}).",
+              "The endpoint was slow or rejected parallel connections during the test. Run again with "
+              "--only keepalive; if it persists, the endpoint limits concurrent connections per client.")
 
     if advertised and w_out in ("fin", "reset") and w_after is not None and w_after + 2 < advertised:
         r.add(Status.WARN, f"Server advertises Keep-Alive timeout={advertised}s but the connection was closed "

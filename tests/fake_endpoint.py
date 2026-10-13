@@ -15,7 +15,7 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 DEFAULTS = dict(idle=30.0, idle_rst=False, block_ua=False, max_url=None, max_body=None, cors=False,
-                keepalive_header=None)
+                keepalive_header=None, broken_preflight=False, mislabel=False, limit_status=None, html=False)
 
 SELECT_JSON = {"head": {"vars": ["x"]}, "results": {"bindings": [{"x": {"type": "literal", "value": "1"}}]}}
 
@@ -66,6 +66,8 @@ class Handler(BaseHTTPRequestHandler):
 
     # ------------------------------------------------------------------ verbs
     def do_OPTIONS(self):
+        if self.server.cfg["broken_preflight"]:
+            return self._send(500, "<html>internal error</html>", "text/html")
         if not self.server.cfg["cors"]:
             return self._send(405, "no")
         self._send(204, b"", extra={"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -74,7 +76,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         cfg = self.server.cfg
         if cfg["max_url"] and len(self.path) > cfg["max_url"]:
-            return self._send(414, "URI Too Long")
+            return self._send(cfg["limit_status"] or 414, "URI Too Long")
         qs = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
         self._answer(qs.get("query", [None])[0])
 
@@ -83,7 +85,7 @@ class Handler(BaseHTTPRequestHandler):
         n = int(self.headers.get("Content-Length") or 0)
         if cfg["max_body"] and n > cfg["max_body"]:
             self.close_connection = True
-            return self._send(413, "Payload Too Large", extra={"Connection": "close"})
+            return self._send(cfg["limit_status"] or 413, "Payload Too Large", extra={"Connection": "close"})
         body = self.rfile.read(n).decode()
         ctype = (self.headers.get("Content-Type") or "").split(";")[0]
         if ctype == "application/x-www-form-urlencoded":
@@ -95,6 +97,8 @@ class Handler(BaseHTTPRequestHandler):
         self._answer(q)
 
     def _answer(self, q):
+        if self.server.cfg["html"]:
+            return self._send(405, "<!DOCTYPE html><html><body>Not Allowed</body></html>", "text/html")
         if self._ua_blocked():
             return self._send(403, "Please set a descriptive User-Agent, see our robot policy.")
         if not q:
@@ -108,9 +112,11 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, json.dumps(SELECT_JSON), "application/sparql-results+json")
         kind = re.sub(r"#[^\n]*", "", q).strip().split()[0].upper()
         if kind == "ASK":
-            if "xml" in accept and "json" not in accept:
+            if self.server.cfg["mislabel"] or ("xml" in accept and "json" not in accept):
                 return self._send(200, '<?xml version="1.0"?><sparql xmlns="http://www.w3.org/2005/sparql-results#">'
-                                       "<head/><boolean>true</boolean></sparql>", "application/sparql-results+xml")
+                                       "<head/><boolean>true</boolean></sparql>",
+                                  "application/sparql-results+json" if self.server.cfg["mislabel"]
+                                  else "application/sparql-results+xml")
             return self._send(200, '{"head":{},"boolean":true}', "application/sparql-results+json")
         if kind == "SELECT":
             if accept in ("*/*", "application/sparql-results+json"):
@@ -155,6 +161,10 @@ if __name__ == "__main__":
     ap.add_argument("--max-body", type=int)
     ap.add_argument("--cors", action="store_true")
     ap.add_argument("--keepalive-header")
+    ap.add_argument("--broken-preflight", action="store_true")
+    ap.add_argument("--mislabel", action="store_true", help="XML ASK body labelled as JSON")
+    ap.add_argument("--limit-status", type=int, help="status for oversized requests, e.g. 403 like a WAF")
+    ap.add_argument("--html", action="store_true", help="answer everything with an HTML 405 page")
     a = vars(ap.parse_args())
     s = start(**a)
     print(f"fake endpoint on {url(s)}")

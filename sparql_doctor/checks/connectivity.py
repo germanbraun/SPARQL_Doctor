@@ -7,7 +7,7 @@ import time
 import urllib.parse
 
 from ..model import CheckResult, Context, Status
-from ..transport import SPARQL_JSON, ask_boolean, sparql_request
+from ..transport import SPARQL_JSON, ask_boolean, body_syntax, sparql_request
 from .common import fingerprint, status_hint
 
 PROBE = "ASK {}"
@@ -91,13 +91,25 @@ def run(ctx: Context) -> CheckResult:
                   "Check TLS settings, proxies and server logs.")
         else:
             ctx.notes["no_sparql"] = True
+            hint = status_hint(first.status) or ""
+            if body_syntax(first) == "html":
+                hint += (" The server answered with an HTML page: check that this is the SPARQL endpoint URL "
+                         "and not a web UI or landing page.")
             r.add(Status.FAIL, f"No SPARQL request succeeded (GET: {first.describe()}). Body: {first.text(200)!r}",
-                  status_hint(first.status))
+                  hint.strip() or None)
     else:
-        if results["GET"].ok and ask_boolean(results["GET"]) is None:
+        get = results["GET"]
+        declared = "json" if "json" in get.content_type else "xml" if "xml" in get.content_type else None
+        actual = body_syntax(get)
+        if get.ok and ask_boolean(get) is None:
             r.add(Status.WARN, f"GET succeeded but the ASK result is not parsable SPARQL JSON/XML "
-                               f"(Content-Type: {results['GET'].content_type or 'none'}).",
+                               f"(Content-Type: {get.content_type or 'none'}).",
                   "Is the URL really the SPARQL endpoint and not a UI page?")
+        elif get.ok and declared and actual in ("json", "xml") and declared != actual:
+            r.add(Status.WARN, f"Content-Type mismatch: response is labelled {get.content_type} but the body is "
+                               f"{actual.upper()}.",
+                  "Clients that trust the Content-Type (RDF4J, Jena, browsers) will fail to parse results. "
+                  "Fix the server or proxy configuration that sets the Content-Type.")
         for m, resp in results.items():
             if not resp.ok:
                 label = {"GET": "GET", "POST": "POST (form)", "POST-DIRECT": "POST (direct)"}[m]

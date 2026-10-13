@@ -84,13 +84,15 @@ def _h2c(ctx: Context, r: CheckResult) -> None:
         r.add(Status.INFO, "Cleartext HTTP/2 upgrade (h2c) is accepted.")
     elif resp.ok:
         r.add(Status.PASS, "Plain-HTTP endpoint ignores the h2c upgrade and answers over HTTP/1.1 (normal).")
-    else:
+    elif sparql_request(t, PROBE, "GET").ok:  # only the Upgrade header makes the difference
         r.add(Status.WARN, f"A request carrying an h2c Upgrade header failed ({resp.describe()}).",
               "Some proxies reject Upgrade headers. Java 11+ HttpClient sends 'Upgrade: h2c' on plain http by default; "
               "force HTTP/1.1 in the client (HttpClient.Version.HTTP_1_1) if queries fail from Java.")
 
 
 def _http2_request(ctx: Context, r: CheckResult) -> None:
+    if ctx.notes.get("alpn") != "h2":
+        return  # server does not offer HTTP/2, so every client will use HTTP/1.1; nothing to compare
     try:
         import h2  # noqa: F401 - httpx needs it for http2=True
         import httpx

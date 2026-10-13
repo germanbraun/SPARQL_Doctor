@@ -11,9 +11,19 @@ from ..model import CheckResult, Context, Status
 from ..transport import Response, Target, sparql_request
 from .common import human_bytes
 
+
+def _failure_hint(resp: Response) -> str:
+    if resp.error_kind in ("reset", "closed", "broken-pipe"):
+        return ("The failure is a connection reset rather than an HTTP 413/414, so clients see "
+                "'Connection reset by peer' instead of a clear error. ")
+    if resp.status == 403:
+        return ("A 403 that depends only on the request size usually comes from a web application firewall "
+                "(e.g. AWS WAF size rules) in front of the endpoint. ")
+    return ""
+
 BASE = "ASK {}\n#"
 GET_LADDER = [1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576]
-POST_LADDER = [16 * 1024, 64 * 1024, 256 * 1024, 1024 * 1024, 4 * 1024 * 1024, 16 * 1024 * 1024]
+POST_LADDER = [1024, 4 * 1024, 16 * 1024, 64 * 1024, 256 * 1024, 1024 * 1024, 4 * 1024 * 1024, 16 * 1024 * 1024]
 
 
 def _padded(length: int) -> str:
@@ -24,10 +34,19 @@ def _url_len(target: Target, qlen: int) -> int:
     return len(target.path_with({"query": _padded(qlen)}))
 
 
-def _search(probe: Callable[[int], Response], ladder: List[int], limit: int, precision: int
+def _search(raw_probe: Callable[[int], Response], ladder: List[int], limit: int, precision: int
             ) -> Tuple[Optional[int], Optional[int], Optional[Response], List[Tuple[int, str]]]:
     """Ladder up to `limit`, then bisect between last success and first failure."""
     log: List[Tuple[int, str]] = []
+
+    def probe(size: int) -> Response:
+        # confirm every failure once so a transient error is not reported as the size limit
+        resp = raw_probe(size)
+        if not resp.ok:
+            log.append((size, resp.describe() + " (retrying)"))
+            resp = raw_probe(size)
+        return resp
+
     ok_at: Optional[int] = None
     fail_at: Optional[int] = None
     fail_resp: Optional[Response] = None
@@ -82,25 +101,23 @@ def run(ctx: Context) -> CheckResult:
         r.add(Status.PASS, f"GET accepts queries of at least {get_ok:,} chars (tested limit).")
     else:
         url = _url_len(t, get_ok)
-        kind = get_resp.error_kind or get_resp.status
         sev = Status.WARN if get_ok < 4000 else Status.INFO
         r.add(sev, f"GET limit: queries up to ~{get_ok:,} chars (URL ≈{url:,} chars) work; "
                    f"{get_fail:,} chars fail with {get_resp.describe()}.",
-              ("The failure is a connection reset rather than an HTTP 414 - clients see 'Connection reset by peer' "
-               "instead of a clear error. " if kind in ("reset", "closed", "broken-pipe") else "")
-              + f"Make sure clients switch to POST above ~{max(1000, int(get_ok * 0.8)):,} chars "
+              _failure_hint(get_resp) + f"Make sure clients switch to POST above ~{max(1000, int(get_ok * 0.8)):,} chars "
                 "(RDF4J switches automatically above ~4 KB of URL).")
 
     # Findings - POST
     for method, (ok, fail, resp) in post_results.items():
         label = "POST (form)" if method == "POST" else "POST (direct)"
         if ok is None:
-            r.add(Status.WARN, f"{label} failed even for {human_bytes(POST_LADDER[0])}: {resp.describe() if resp else '?'}")
+            r.add(Status.WARN, f"{label} with a {human_bytes(POST_LADDER[0])} query fails: {resp.describe() if resp else '?'}",
+                  _failure_hint(resp).strip() or None if resp else None)
         elif fail is None:
             r.add(Status.PASS, f"{label} accepts at least {human_bytes(ok)} (tested limit).")
         else:
             r.add(Status.WARN if ok < 1024 * 1024 else Status.INFO,
                   f"{label} limit: {human_bytes(ok)} works, {human_bytes(fail)} fails with {resp.describe()}.",
-                  "Large generated queries (VALUES blocks, long FILTER IN lists) beyond this size will fail; "
+                  _failure_hint(resp) + "Larger generated queries (VALUES blocks, long FILTER IN lists) will fail; "
                   "raise client_max_body_size / maxPostSize on the proxy or server, or batch the VALUES.")
     return r.finalize()

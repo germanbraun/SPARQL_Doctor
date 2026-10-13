@@ -178,6 +178,8 @@ class Response:
         return t[:limit] + ("…" if len(t) > limit else "")
 
     def describe(self) -> str:
+        if self.error and self.status:
+            return f"{self.status} {self.reason} (then {self.error_kind}: {self.error})"
         if self.error:
             return f"{self.error_kind}: {self.error}"
         return f"{self.status} {self.reason}".strip()
@@ -272,6 +274,7 @@ def raw_request(target: Target, method: str, path: str, headers: Optional[Dict[s
     except BaseException as e:  # noqa: BLE001 - network probing must not crash
         if isinstance(e, KeyboardInterrupt):
             raise
+        # status/headers stay set if the failure happened while reading the body
         resp_obj.error_kind, resp_obj.error = classify_exception(e)
         if conn is not None:
             conn.close()
@@ -306,18 +309,30 @@ def sparql_request(target: Target, query: str, method: str = "GET", accept: Opti
 
 
 def ask_boolean(resp: Response) -> Optional[bool]:
-    """Extract the boolean from an ASK result (JSON or XML); None if unparsable."""
+    """Extract the boolean from an ASK result (JSON or XML, whatever the Content-Type
+    claims); None if unparsable."""
     import json
     import re
 
     if not resp.ok:
         return None
     try:
-        if "json" in resp.content_type:
-            return bool(json.loads(resp.body.decode("utf-8"))["boolean"])
+        return bool(json.loads(resp.body.decode("utf-8"))["boolean"])
     except Exception:  # noqa: BLE001
-        return None
+        pass
     m = re.search(rb"<boolean>\s*(true|false)\s*</boolean>", resp.body)
     if m:
         return m.group(1) == b"true"
+    return None
+
+
+def body_syntax(resp: Response) -> Optional[str]:
+    """Rough syntax of the body: 'json', 'xml', 'html' or None."""
+    head = resp.body.lstrip()[:200].lower()
+    if head.startswith((b"{", b"[")):
+        return "json"
+    if head.startswith((b"<!doctype html", b"<html")):
+        return "html"
+    if head.startswith(b"<"):
+        return "xml"
     return None

@@ -134,3 +134,41 @@ def test_cli_end_to_end(tmp_path):
     data = json.loads(js.read_text())
     assert {c["id"] for c in data["checks"]} >= {"connectivity", "keepalive", "federation"}
     srv.shutdown()
+
+
+def test_content_type_mismatch():
+    srv, ctx = make(mislabel=True)
+    r = connectivity.run(ctx)
+    assert any("Content-Type mismatch" in f.message for f in r.findings)
+    srv.shutdown()
+
+
+def test_cors_broken_preflight_is_info_without_auth():
+    srv, ctx = make(cors=True, broken_preflight=True)
+    r = cors.run(ctx)
+    assert r.status == Status.PASS
+    assert any(f.status == Status.INFO and "preflight fails" in f.message for f in r.findings)
+    ctx.target.headers["Authorization"] = "Bearer x"
+    assert cors.run(ctx).status == Status.WARN
+    srv.shutdown()
+
+
+def test_waf_style_size_limit():
+    srv, ctx = make(max_url=2048, max_body=3000, limit_status=403)
+    r = query_length.run(ctx)
+    assert r.data["post"]["max_ok_bytes"] == 1024
+    hints = " ".join(f.hint or "" for f in r.findings)
+    assert "web application firewall" in hints
+    srv.shutdown()
+
+
+def test_not_a_sparql_endpoint_skips_rest(tmp_path):
+    srv = fake_endpoint.start(html=True)
+    js = tmp_path / "r.json"
+    assert cli.main([fake_endpoint.url(srv), "--quick", "--delay", "0", "--json", str(js)]) == 2
+    checks = {c["id"]: c for c in json.loads(js.read_text())["checks"]}
+    fail = next(f for f in checks["connectivity"]["findings"] if f["status"] == "fail")
+    assert "HTML page" in fail["hint"]
+    assert checks["http"]["status"] != "warn"
+    assert checks["keepalive"]["status"] == "skip" and checks["formats"]["status"] == "skip"
+    srv.shutdown()

@@ -127,16 +127,20 @@ echo $?   # 0 = all good, 1 = warnings, 2 = failures
 
 ## The checks
 
+New to these topics? **[docs/CHECKS.md](docs/CHECKS.md)** explains each check in plain language: what it is, why it
+breaks things, what the tool does, how to read the result and how to fix it. It starts with a
+"[which check matches my symptom](docs/CHECKS.md#start-from-your-symptom)" table.
+
 | Id | What it finds |
 |---|---|
-| `connectivity` | DNS, TCP, redirects (and whether a redirect turns a POST into a GET, dropping the query), GET / form POST / direct POST support, server and proxy/CDN fingerprint |
-| `http` | TLS version, certificate expiry and verification, ALPN (h2 vs http/1.1), h2c upgrade handling, HTTP/1.0 proxies. With the `http2` extra it also runs a real query over HTTP/2 and HTTP/1.1 and compares them |
-| `keepalive` | Keep-alive support, the advertised `Keep-Alive: timeout`, the **actual** idle timeout (a passive close/reset watch plus a "pooled connection reuse" ladder), silent drops by NAT/firewalls, and advertised vs. real timeout mismatches |
-| `user-agent` | Missing and library-default User-Agents (Java, Apache HttpClient, python-requests, curl) compared with browser and descriptive ones |
-| `cors` | A simple GET and the POST preflight from `--origin` |
-| `formats` | SELECT (JSON, XML, CSV, TSV, binary) and CONSTRUCT (Turtle, N-Triples, RDF/XML, JSON-LD, N-Quads, TriG) negotiation, the default format, 406 behaviour |
-| `query-length` | Largest GET query (narrowed down to about 128 chars) and POST body, and the failure mode |
-| `federation` | For each `--service URL`: a `SERVICE` call made by the endpoint, compared with a direct call from your machine, with the error classified |
+| [`connectivity`](docs/CHECKS.md#1-connectivity--sparql-protocol) | DNS, TCP, redirects (and whether a redirect turns a POST into a GET, dropping the query), GET / form POST / direct POST support, server and proxy/CDN fingerprint |
+| [`http`](docs/CHECKS.md#2-http-version--tls) | TLS version, certificate expiry and verification, ALPN (h2 vs http/1.1), h2c upgrade handling, HTTP/1.0 proxies. With the `http2` extra it also runs a real query over HTTP/2 and HTTP/1.1 and compares them |
+| [`keepalive`](docs/CHECKS.md#3-keep-alive--idle-timeout) | Keep-alive support, the advertised `Keep-Alive: timeout`, the **actual** idle timeout (a passive close/reset watch plus a "pooled connection reuse" ladder), silent drops by NAT/firewalls, and advertised vs. real timeout mismatches |
+| [`user-agent`](docs/CHECKS.md#4-user-agent-policy) | Missing and library-default User-Agents (Java, Apache HttpClient, python-requests, curl) compared with browser and descriptive ones |
+| [`cors`](docs/CHECKS.md#5-cors) | Simple GET and form POST, and the preflight for direct POST, from `--origin` |
+| [`formats`](docs/CHECKS.md#6-result-formats) | SELECT (JSON, XML, CSV, TSV, binary) and CONSTRUCT (Turtle, N-Triples, RDF/XML, JSON-LD, N-Quads, TriG) negotiation, the default format, 406 behaviour |
+| [`query-length`](docs/CHECKS.md#7-maximum-query-length) | Largest GET query (narrowed down to about 128 chars) and POST body, and the failure mode |
+| [`federation`](docs/CHECKS.md#8-federation-service-reachability) | For each `--service URL`: a `SERVICE` call made by the endpoint, compared with a direct call from your machine, with the error classified |
 
 Run a subset with `--only connectivity,keepalive` or exclude checks with `--skip formats`. If the endpoint is
 unreachable, the remaining checks are skipped.

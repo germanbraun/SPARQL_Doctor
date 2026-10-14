@@ -88,4 +88,5 @@ See [README.md](README.md) for usage and what each check reports.
 - Probe queries must be cheap (`ASK {}`, comment padding, `LIMIT 1` inside SERVICE); be polite to public endpoints.
 - New check behaviour gets a fake-endpoint switch in `tests/fake_endpoint.py` and a test in `tests/test_checks.py`.
 - Keep `requirements.txt` in sync with the dependencies in `pyproject.toml`.
-- Installation docs live in `ONBOARDING.md`, usage docs in `README.md`; update them when CLI options change.
+- Installation docs live in `ONBOARDING.md`, usage docs in `README.md`, per-check explanations in `docs/CHECKS.md`;
+  update them when CLI options or check behaviour change.

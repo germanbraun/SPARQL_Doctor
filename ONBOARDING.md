@@ -39,9 +39,17 @@ pipx install "sparql-doctor[http2] @ git+https://github.com/germanbraun/SPARQL_D
 
 ```bash
 python3 -m venv ~/.venvs/sparql-doctor
-source ~/.venvs/sparql-doctor/bin/activate        # Windows: %USERPROFILE%\.venvs\sparql-doctor\Scripts\activate
-pip install git+https://github.com/germanbraun/SPARQL_Doctor.git
+~/.venvs/sparql-doctor/bin/pip install git+https://github.com/germanbraun/SPARQL_Doctor.git
 ```
+
+The command now lives at `~/.venvs/sparql-doctor/bin/sparql-doctor`. To call it as plain `sparql-doctor` from any
+terminal, link it into a folder on your PATH:
+
+```bash
+mkdir -p ~/.local/bin && ln -sf ~/.venvs/sparql-doctor/bin/sparql-doctor ~/.local/bin/sparql-doctor
+```
+
+On Windows, run `%USERPROFILE%\.venvs\sparql-doctor\Scripts\sparql-doctor.exe` directly or add that folder to PATH.
 
 ### Option C: no install at all (locked-down servers)
 
@@ -62,6 +70,17 @@ sparql-doctor https://query.wikidata.org/sparql --quick
 
 The second command takes about 30 seconds. It should finish with a summary line and one **WARN** for the Wikidata
 User-Agent policy. That warning is expected and shows the tool works.
+
+### `command not found: sparql-doctor`
+
+The tool is installed but its folder is not on your PATH, or it was installed into a virtual environment that is not
+active.
+
+- After **pipx**: run `pipx ensurepath` and open a new terminal.
+- After **Option B**: run the `ln -sf …` command above, check that `~/.local/bin` is on your PATH
+  (`echo $PATH`), and open a new terminal. If it is not on your PATH, add `export PATH="$HOME/.local/bin:$PATH"` to
+  `~/.zshrc` (macOS) or `~/.bashrc` (Linux).
+- Not sure it is installed at all? `python3 -m sparql_doctor --version` works wherever the package is importable.
 
 ## Optional: HTTP/2 extra
 

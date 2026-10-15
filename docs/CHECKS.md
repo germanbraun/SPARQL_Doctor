@@ -320,7 +320,7 @@ It pretends to be a page on `--origin` (default `https://example.org`) and sends
 Test with your app's real origin:
 
 ```bash
-sparql-doctor https://kg.example.com/sparql --only cors --origin https://app.example.com
+sparql-doctor <your-endpoint-url> --only cors --origin <your-app-origin>
 ```
 
 ---

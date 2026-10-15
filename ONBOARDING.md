@@ -58,7 +58,7 @@ folder (for example from a downloaded ZIP of the repository) to the server and r
 that contains it:
 
 ```bash
-python3 -m sparql_doctor https://your-endpoint/sparql
+python3 -m sparql_doctor <your-endpoint-url>
 ```
 
 ## 3. Verify

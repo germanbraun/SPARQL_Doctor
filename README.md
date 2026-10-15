@@ -35,8 +35,12 @@ Summary: 7 pass, 1 warn, 0 fail, 0 info, 0 skipped
 
 ## Creating a report for a support ticket
 
+In the examples below, replace `<your-endpoint-url>` with the full URL of your SPARQL endpoint, for example
+`http://localhost:7200/repositories/myrepo` (GraphDB), `http://localhost:3030/ds/sparql` (Fuseki) or
+`https://query.wikidata.org/sparql`. Replace the `<` and `>` too: they only mark the placeholder.
+
 ```bash
-sparql-doctor https://kg.example.com/sparql --markdown sparql-doctor-report.md
+sparql-doctor <your-endpoint-url> --markdown sparql-doctor-report.md
 ```
 
 Attach `sparql-doctor-report.md` to the ticket. It contains the endpoint, the time, the client host and OS, the proxy,
@@ -55,11 +59,11 @@ an application server shows the errors, run SPARQL Doctor on that server.
 
 ```bash
 # Bearer token / API key
-sparql-doctor https://kg.example.com/sparql -H 'Authorization: Bearer eyJ…'
+sparql-doctor <your-endpoint-url> -H 'Authorization: Bearer eyJ…'
 
 # Basic auth: either form works
-sparql-doctor https://alice:secret@kg.example.com/sparql
-sparql-doctor https://kg.example.com/sparql -H "Authorization: Basic $(printf alice:secret | base64)"
+sparql-doctor https://<user>:<password>@<your-endpoint-host>/sparql
+sparql-doctor <your-endpoint-url> -H "Authorization: Basic $(printf '<user>:<password>' | base64)"
 ```
 
 `-H` can be repeated for any additional header.
@@ -67,7 +71,7 @@ sparql-doctor https://kg.example.com/sparql -H "Authorization: Basic $(printf al
 ### "Connection reset by peer" / intermittent failures
 
 ```bash
-sparql-doctor https://kg.example.com/sparql --only keepalive --idle-max 360 -v
+sparql-doctor <your-endpoint-url> --only keepalive --idle-max 360 -v
 ```
 
 This measures how long the endpoint, or a load balancer or firewall in front of it, keeps an idle connection open, and
@@ -92,7 +96,7 @@ sparql-doctor https://query.wikidata.org/sparql --only user-agent -A 'MyCompanyK
 ### Federated queries (`SERVICE`) failing
 
 ```bash
-sparql-doctor https://kg.example.com/sparql \
+sparql-doctor <your-endpoint-url> \
     --service https://query.wikidata.org/sparql \
     --service https://internal-kg.corp/sparql
 ```
@@ -104,7 +108,7 @@ whether to look at the endpoint's network egress, proxy, trust store or outgoing
 ### Long or generated queries failing
 
 ```bash
-sparql-doctor https://kg.example.com/sparql --only query-length --max-post 16777216
+sparql-doctor <your-endpoint-url> --only query-length --max-post 16777216
 ```
 
 Finds the largest GET query and POST body the path accepts, and how larger ones fail: a clean `414`/`413`, or a
@@ -113,13 +117,13 @@ connection reset that looks like a network problem.
 ### Browser apps (CORS)
 
 ```bash
-sparql-doctor https://kg.example.com/sparql --only cors --origin https://app.example.com
+sparql-doctor <your-endpoint-url> --only cors --origin <your-app-origin>
 ```
 
 ### Quick health check / CI
 
 ```bash
-sparql-doctor https://kg.example.com/sparql --quick
+sparql-doctor <your-endpoint-url> --quick
 echo $?   # 0 = all good, 1 = warnings, 2 = failures
 ```
 

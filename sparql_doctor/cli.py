@@ -21,7 +21,7 @@ from .transport import DEFAULT_USER_AGENT, Target, redact_headers
 
 EPILOG = """examples:
   sparql-doctor https://query.wikidata.org/sparql
-  sparql-doctor https://kg.example.com/sparql -H 'Authorization: Bearer ...' \\
+  sparql-doctor <your-endpoint-url> -H 'Authorization: Bearer ...' \\
       --service https://query.wikidata.org/sparql --markdown report.md
   sparql-doctor http://localhost:7200/repositories/kb --quick --only keepalive,query-length
 

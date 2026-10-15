@@ -50,7 +50,7 @@ def _search(raw_probe: Callable[[int], Response], ladder: List[int], limit: int,
     ok_at: Optional[int] = None
     fail_at: Optional[int] = None
     fail_resp: Optional[Response] = None
-    for size in [s for s in ladder if s <= limit] or [limit]:
+    for size in [s for s in ladder if s < limit] + [limit]:  # always test the configured maximum itself
         resp = probe(size)
         log.append((size, resp.describe()))
         if resp.ok:
@@ -116,7 +116,7 @@ def run(ctx: Context) -> CheckResult:
         elif fail is None:
             r.add(Status.PASS, f"{label} accepts at least {human_bytes(ok)} (tested limit).")
         else:
-            r.add(Status.WARN if ok < 1024 * 1024 else Status.INFO,
+            r.add(Status.WARN if ok < 256 * 1024 else Status.INFO,
                   f"{label} limit: {human_bytes(ok)} works, {human_bytes(fail)} fails with {resp.describe()}.",
                   _failure_hint(resp) + "Larger generated queries (VALUES blocks, long FILTER IN lists) will fail; "
                   "raise client_max_body_size / maxPostSize on the proxy or server, or batch the VALUES.")

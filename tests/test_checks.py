@@ -172,3 +172,27 @@ def test_not_a_sparql_endpoint_skips_rest(tmp_path):
     assert checks["http"]["status"] != "warn"
     assert checks["keepalive"]["status"] == "skip" and checks["formats"]["status"] == "skip"
     srv.shutdown()
+
+
+def test_human_bytes_keeps_nearby_sizes_comparable():
+    from sparql_doctor.checks.common import human_bytes
+    assert human_bytes(1_024_000) == "1,000 KB"
+    assert human_bytes(1024 * 1024) == "1,024 KB"
+    assert human_bytes(16 * 1024 * 1024) == "16 MB"
+
+
+def test_generous_post_limit_is_info_not_warn():
+    srv, ctx = make(max_body=600_000)
+    ctx.max_post = 2 * 1024 * 1024
+    r = query_length.run(ctx)
+    post = [f for f in r.findings if f.message.startswith("POST (form) limit")][0]
+    assert post.status == Status.INFO
+    srv.shutdown()
+
+
+def test_size_search_tests_the_configured_maximum():
+    srv, ctx = make()
+    ctx.max_post = 100_000  # not a ladder step
+    r = query_length.run(ctx)
+    assert r.data["post"]["max_ok_bytes"] == 100_000
+    srv.shutdown()

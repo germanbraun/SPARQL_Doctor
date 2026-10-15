@@ -400,7 +400,7 @@ mistaken for a limit.
 |---|---|
 | ✔ accepts at least N (tested limit) | No limit up to the tested size. Raise `--max-get` / `--max-post` to test further. |
 | ℹ / ⚠ GET limit: up to ~N chars work | Make sure clients switch to POST for longer queries (most do automatically above about 4 KB). WARN if the limit is under 4,000 characters. |
-| ⚠ POST limit: X works, Y fails | Queries larger than X fail. Raise the limit on the proxy or server, or split large `VALUES` blocks into batches. |
+| ℹ / ⚠ POST limit: X works, Y fails | Queries larger than X fail. Raise the limit on the proxy or server, or split large `VALUES` blocks into batches. WARN if the limit is under 256 KB; above that (e.g. nginx's 1 MB default) it is INFO, because few real queries are that large. |
 | Failure is a connection reset | The server cuts the connection instead of answering 413/414, so clients see `Connection reset by peer`. |
 | Failure is a `403` | Size-based `403`s usually come from a WAF (e.g. AWS WAF body-size rules). Adjust the WAF rule. |
 

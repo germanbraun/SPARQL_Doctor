@@ -82,6 +82,6 @@ def short(text: str, n: int = 160) -> str:
 def human_bytes(n: int) -> str:
     if n < 1024:
         return f"{n} B"
-    if n < 1024 * 1024:
-        return f"{n / 1024:.1f}".removesuffix(".0") + " KB"
+    if n < 10 * 1024 * 1024:  # KB up to 10 MB, so "1,000 KB" vs "1,024 KB" stays comparable
+        return f"{n / 1024:,.1f}".removesuffix(".0") + " KB"
     return f"{n / (1024 * 1024):.1f}".removesuffix(".0") + " MB"
